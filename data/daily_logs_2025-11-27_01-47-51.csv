@@ -1,0 +1,5 @@
+﻿ID,Timestamp_UTC,Timestamp_Taiwan,Sentiment,Latitude,Longitude,Vlog_URI
+4,"2025-11-26T17:47:47.329Z","2025-11-27 01:47:47",4,24.7928727,120.9775693,"file:///storage/emulated/0/DCIM/2fb13eae-5361-4931-9950-214a1a1cda66.mp4"
+3,"2025-11-26T17:29:27.857Z","2025-11-27 01:29:27",3,24.7928727,120.9775693,"file:///storage/emulated/0/DCIM/ac6ab745-7ab0-4fc2-8849-8758769393bf.mp4"
+2,"2025-11-26T06:00:32.857Z","2025-11-26 14:00:32",2,24.7928718,120.9775844,"file:///storage/emulated/0/DCIM/b7ec15cb-b44c-428b-adee-3565c22512f1.mp4"
+1,"2025-11-26T04:45:33.866Z","2025-11-26 12:45:33",3,24.7928684,120.97757,"file:///storage/emulated/0/DCIM/2d4385b8-5379-4e22-9789-25737c0f73c7.mp4"
