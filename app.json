@@ -2,25 +2,76 @@
   "expo": {
     "scheme": "acme",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "允許 $(PRODUCT_NAME) 使用相機來錄製 vlog",
+          "microphonePermission": "允許 $(PRODUCT_NAME) 使用麥克風來錄製 vlog",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "允許 $(PRODUCT_NAME) 儲存您的 vlog",
+          "savePhotosPermission": "允許 $(PRODUCT_NAME) 儲存您的 vlog",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "允許 $(PRODUCT_NAME) 在背景收集位置資料",
+          "locationAlwaysPermission": "允許 $(PRODUCT_NAME) 在背景收集位置資料",
+          "locationWhenInUsePermission": "允許 $(PRODUCT_NAME) 收集位置資料"
+        }
+      ],
+      [
+        "expo-notifications"
+      ]
     ],
     "name": "expo-router-mwe",
     "slug": "expo-router-mwe",
     "android": {
-      "package": "com.spiketren.exporoutermwe"
+      "package": "com.spiketren.exporoutermwe",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7918e76f-59e9-45c4-aae4-c99cec64cfac"
+        "projectId": "b50bcaae-2334-45f1-9551-11d50aca04bd"
       }
     },
-    "owner": "spiketren",
     "ios": {
       "bundleIdentifier": "com.spiketren.exporoutermwe",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "允許 $(PRODUCT_NAME) 使用相機來錄製 vlog",
+        "NSMicrophoneUsageDescription": "允許 $(PRODUCT_NAME) 使用麥克風來錄製 vlog",
+        "NSPhotoLibraryUsageDescription": "允許 $(PRODUCT_NAME) 儲存您的 vlog",
+        "NSPhotoLibraryAddUsageDescription": "允許 $(PRODUCT_NAME) 儲存您的 vlog",
+        "NSLocationWhenInUseUsageDescription": "允許 $(PRODUCT_NAME) 收集位置資料",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "允許 $(PRODUCT_NAME) 在背景收集位置資料",
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
-    }
+    },
+    "owner": "yessinea"
   }
 }

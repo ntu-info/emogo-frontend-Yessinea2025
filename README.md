@@ -26,3 +26,6 @@ This is a very small Expo project using **expo-router** with:
    ```
 
 3. Open the app on a device or emulator using the Expo dev tools.
+
+4. Send and open the URL below to install it on a device.  
+   https://expo.dev/accounts/yessinea/projects/expo-router-mwe/builds/8ef0b4c1-abb7-4007-82cc-1e2b465809b6
