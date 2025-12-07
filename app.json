@@ -30,7 +30,8 @@
       ],
       [
         "expo-notifications"
-      ]
+      ],
+      "expo-secure-store"
     ],
     "name": "expo-router-mwe",
     "slug": "expo-router-mwe",

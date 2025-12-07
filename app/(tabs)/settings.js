@@ -42,6 +42,7 @@ import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
 import { getAllDailyLogs } from "../../database/db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { testConnection, getBackendURL } from '../../api/backend';
 
 // 設定通知處理器
 Notifications.setNotificationHandler({
@@ -68,6 +69,8 @@ export default function SettingsScreen() {
   const [selectedPeriod, setSelectedPeriod] = useState("AM");
   const [selectedHour, setSelectedHour] = useState("9");
   const [selectedMinute, setSelectedMinute] = useState("00");
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+
 
   useEffect(() => {
     checkNotificationPermission();
@@ -596,6 +599,7 @@ export default function SettingsScreen() {
     }
   };
 
+
   // 測試通知
   const testNotification = async () => {
     try {
@@ -620,6 +624,25 @@ export default function SettingsScreen() {
     }
   };
 
+  // 測試後端連接
+  const testBackendConnection = async () => {
+    setIsTestingConnection(true);
+    const result = await testConnection();
+    setIsTestingConnection(false);
+
+    if (result.success) {
+      Alert.alert(
+        '✅ 連接成功',
+        `成功連接到後端伺服器！`
+      );
+    } else {
+      Alert.alert(
+        '❌ 連接失敗',
+        result.error || '無法連接到後端伺服器'
+      );
+    }
+  };
+  
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>設定</Text>
@@ -662,6 +685,19 @@ export default function SettingsScreen() {
 
           </>
         )}
+      </View>
+
+      {/* 測試後端連接 */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.testConnectionButton}
+          onPress={testBackendConnection}
+          disabled={isTestingConnection}
+        >
+          <Text style={styles.testConnectionButtonText}>
+            {isTestingConnection ? '測試中...' : '🔍 測試後端連接'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* 資料匯出 */}
@@ -919,6 +955,17 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 8,
     textAlign: "center",
+  },
+  testConnectionButton: {
+    backgroundColor: '#2196F3',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  testConnectionButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   infoBox: {
     backgroundColor: "#FFF9E6",

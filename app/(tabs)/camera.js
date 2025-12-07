@@ -1,21 +1,24 @@
 import { useState, useRef, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform, ActivityIndicator } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
 import * as Location from "expo-location";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { insertDailyLog } from "../../database/db";
+import { insertDailyLog, markAsSynced, recordSyncFailure } from "../../database/db";
+import { uploadDailyLog } from "../../api/backend";
 
 export default function CameraScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const sentiment = params.sentiment ? parseInt(params.sentiment) : null;
+  const note = params.note || ""; // 🆕 接收 note
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
   const [facing, setFacing] = useState("front");
   const [isRecording, setIsRecording] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const cameraRef = useRef(null);
   const timerRef = useRef(null);
@@ -79,6 +82,8 @@ export default function CameraScreen() {
   };
 
   const recordOneSecondVlog = async () => {
+    let insertedId = null;
+    
     try {
       if (!cameraRef.current || isRecording) return;
 
@@ -110,25 +115,64 @@ export default function CameraScreen() {
       // 取得位置
       const location = await getCurrentLocation();
 
-      // 儲存到資料庫
-      await insertDailyLog({
+      // === 1. 先儲存到本地資料庫 ===
+      const logData = {
         timestamp: new Date().toISOString(),
         sentiment: sentiment,
         lat: location.lat,
         lng: location.lng,
         vlog_uri: asset.uri,
-      });
+      };
 
-      Alert.alert(
-        "✅ 錄製成功",
-        "1秒 vlog 已儲存到相簿並記錄到資料庫！",
-        [
-          {
-            text: "返回首頁",
-            onPress: () => router.push("/(tabs)"),
-          },
-        ]
+      const result = await insertDailyLog(logData);
+      insertedId = result.lastInsertRowId;
+      
+      console.log(`✅ 本地儲存成功，ID: ${insertedId}`);
+
+      // === 2. 嘗試上傳到雲端 ===
+      setIsUploading(true);
+      
+      const uploadResult = await uploadDailyLog(
+        sentiment,
+        location.lat,
+        location.lng,
+        asset.uri,
+        note // 🆕 傳遞 note 到後端
       );
+
+      setIsUploading(false);
+
+      if (uploadResult.success) {
+        // 上傳成功 - 標記為已同步
+        await markAsSynced(insertedId);
+        
+        Alert.alert(
+          "✅ 成功！",
+          "1秒 vlog 已儲存\n\n✓ 本地儲存\n✓ 雲端同步",
+          [
+            {
+              text: "返回首頁",
+              onPress: () => router.push("/(tabs)"),
+            },
+          ]
+        );
+      } else {
+        // 上傳失敗 - 記錄失敗次數
+        await recordSyncFailure(insertedId);
+        
+        // 顯示警告但不阻擋使用者
+        Alert.alert(
+          "⚠️ 部分成功",
+          `1秒 vlog 已儲存到本地！\n\n✓ 本地儲存成功\n✗ 雲端同步失敗\n\n原因：${uploadResult.errors.join(', ')}\n\n稍後可在設定中重新同步`,
+          [
+            {
+              text: "返回首頁",
+              onPress: () => router.push("/(tabs)"),
+            },
+          ]
+        );
+      }
+      
     } catch (err) {
       console.error("Recording error:", err);
       
@@ -139,7 +183,14 @@ export default function CameraScreen() {
       }
       
       setIsRecording(false);
+      setIsUploading(false);
       setRecordingTime(0);
+      
+      // 如果有 insertedId，記錄同步失敗
+      if (insertedId) {
+        await recordSyncFailure(insertedId);
+      }
+      
       Alert.alert("錯誤", "錄製失敗，請稍後再試");
     }
   };
@@ -179,6 +230,16 @@ export default function CameraScreen() {
         </View>
       )}
 
+      {/* 上傳進度顯示 */}
+      {isUploading && (
+        <View style={styles.uploadingOverlay}>
+          <View style={styles.uploadingBox}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.uploadingText}>正在同步到雲端...</Text>
+          </View>
+        </View>
+      )}
+
       {/* 錄製按鈕 */}
       <TouchableOpacity
         onPress={isRecording ? stopRecording : recordOneSecondVlog}
@@ -186,7 +247,7 @@ export default function CameraScreen() {
           styles.recordButton,
           isRecording && styles.recordingButton,
         ]}
-        disabled={isRecording}
+        disabled={isRecording || isUploading}
       >
         {isRecording ? (
           <View style={styles.innerStop} />
@@ -196,14 +257,14 @@ export default function CameraScreen() {
       </TouchableOpacity>
 
       {/* 切換鏡頭按鈕 */}
-      {!isRecording && (
+      {!isRecording && !isUploading && (
         <TouchableOpacity onPress={toggleCamera} style={styles.switchButton}>
           <Text style={styles.buttonText}>🔄</Text>
         </TouchableOpacity>
       )}
 
       {/* 返回按鈕 */}
-      {!isRecording && (
+      {!isRecording && !isUploading && (
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
@@ -215,7 +276,7 @@ export default function CameraScreen() {
       {/* 說明文字 */}
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          💡 點擊紅色按鈕開始錄製，將自動錄製 1 秒 vlog
+          💡 點擊紅色按鈕錄製 1 秒 vlog
         </Text>
       </View>
     </View>
@@ -223,118 +284,134 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "black" 
+  container: {
+    flex: 1,
+    backgroundColor: "black",
   },
-  camera: { 
-    flex: 1 
+  camera: {
+    flex: 1,
   },
   center: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#000",
+    alignItems: "center",
+    padding: 20,
   },
   permissionText: {
-    color: "white",
-    fontSize: 18,
-    marginBottom: 20,
+    fontSize: 16,
     textAlign: "center",
+    marginBottom: 20,
   },
   button: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#4CAF50",
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   buttonText: {
     color: "white",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "bold",
   },
   timerBadge: {
     position: "absolute",
-    top: 80,
+    top: 60,
     alignSelf: "center",
-    backgroundColor: "rgba(255, 59, 48, 0.9)",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    backgroundColor: "rgba(255, 0, 0, 0.8)",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
     borderRadius: 20,
-    zIndex: 10,
   },
   timerText: {
     color: "white",
-    fontSize: 32,
+    fontSize: 18,
     fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  uploadingBox: {
+    backgroundColor: "white",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  uploadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "600",
   },
   recordButton: {
     position: "absolute",
-    bottom: 40,
+    bottom: 50,
     alignSelf: "center",
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "transparent",
-    alignItems: "center",
+    backgroundColor: "white",
     justifyContent: "center",
-    borderWidth: 4,
-    borderColor: "white",
-    zIndex: 10,
+    alignItems: "center",
+    borderWidth: 5,
+    borderColor: "#FF0000",
   },
   recordingButton: {
-    backgroundColor: "transparent",
-    opacity: 0.8,
+    borderColor: "#FF0000",
+    backgroundColor: "#FF0000",
   },
   innerDot: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#ff3b30",
-    borderWidth: 4,
-    borderColor: "rgba(255,255,255,0.9)",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#FF0000",
   },
   innerStop: {
     width: 40,
     height: 40,
-    borderRadius: 6,
-    backgroundColor: "#ffffff",
+    backgroundColor: "white",
   },
   switchButton: {
     position: "absolute",
-    top: 60,
-    right: 20,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    padding: 12,
-    borderRadius: 25,
+    bottom: 60,
+    right: 30,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
     width: 50,
     height: 50,
-    alignItems: "center",
+    borderRadius: 25,
     justifyContent: "center",
-    zIndex: 10,
+    alignItems: "center",
   },
   backButton: {
     position: "absolute",
-    top: 60,
+    top: 50,
     left: 20,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     paddingHorizontal: 15,
     paddingVertical: 10,
-    borderRadius: 20,
-    zIndex: 10,
+    borderRadius: 8,
   },
   instructions: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    padding: 15,
-    zIndex: 10,
+    bottom: 150,
+    alignSelf: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
   instructionText: {
     color: "white",
-    textAlign: "center",
     fontSize: 14,
   },
 });
